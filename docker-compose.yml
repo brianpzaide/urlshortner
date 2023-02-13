@@ -1,0 +1,30 @@
+version: '3'
+
+services:
+  db:
+    container_name: urlshortner_db
+    image: 'postgres'
+    ports:
+      - "5432:5432"
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: mysecretpassword
+      POSTGRES_DB: urlshortner
+    volumes:
+      - ./db-data/postgres/:/var/lib/postgresql/data/
+    networks:
+      - db-net
+
+  app:
+    container_name: urlshortner_app
+    build:
+      context: .
+    env_file: dsn.env
+    ports:
+      - "4000:4000"
+    networks:
+      - db-net
+  
+networks:
+  db-net: {}
