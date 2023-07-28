@@ -2,7 +2,6 @@ package mock
 
 import (
 	"sync"
-	"time"
 	"urlshortner/models"
 )
 
@@ -14,8 +13,8 @@ type UrlModel struct {
 	DB map[string]*models.Url
 }
 
-func (u UrlModel) Insert(targetUrl string, userId int64) error {
-	urlKey := models.GenURLKey(URL_KEY_LENGTH)
+func (u UrlModel) Insert(url *models.Url) error {
+	/*urlKey := models.GenURLKey(URL_KEY_LENGTH)
 	rwmutex.RLock()
 	for _, ok := u.DB[urlKey]; ok; {
 		urlKey = models.GenURLKey(7)
@@ -30,11 +29,31 @@ func (u UrlModel) Insert(targetUrl string, userId int64) error {
 		UserId:    userId,
 		CreatedAt: time.Now(),
 		Visits:    0,
-	}
+	}*/
 	return nil
 }
 
-func (u UrlModel) GetTargetUrl(urlKey string, getInfo bool) (*models.Url, error) {
+func (u UrlModel) ListUrls(userId int64) ([]*models.Url, error) {
+	/*urlKey := models.GenURLKey(URL_KEY_LENGTH)
+	rwmutex.RLock()
+	for _, ok := u.DB[urlKey]; ok; {
+		urlKey = models.GenURLKey(7)
+	}
+	rwmutex.RUnlock()
+
+	rwmutex.Lock()
+	defer rwmutex.Unlock()
+	u.DB[urlKey] = &models.Url{
+		TargetUrl: targetUrl,
+		ShortUrl:  urlKey,
+		UserId:    userId,
+		CreatedAt: time.Now(),
+		Visits:    0,
+	}*/
+	return nil, nil
+}
+
+func (u UrlModel) GetTargetUrl(urlKey string, userId int64, getInfo bool) (*models.Url, error) {
 	rwmutex.RLock()
 	url, ok := u.DB[urlKey]
 	rwmutex.RUnlock()
@@ -56,7 +75,7 @@ func (u UrlModel) updateVisitsForUrl(urlKey string) {
 	}
 }
 
-func (u UrlModel) DeleteUrl(urlKey string) error {
+func (u UrlModel) DeleteUrl(urlKey string, userId int64) error {
 	rwmutex.Lock()
 	defer rwmutex.Unlock()
 	delete(u.DB, urlKey)

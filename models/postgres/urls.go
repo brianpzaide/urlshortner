@@ -1,9 +1,11 @@
 package postgres
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 	"urlshortner/models"
 )
 
@@ -28,6 +30,48 @@ func (u UrlModel) Insert(url *models.Url) error {
 		}
 		return nil
 	}
+}
+
+func (u UrlModel) ListUrls(userId int64) ([]*models.Url, error) {
+	var query string
+	args := []interface{}{userId}
+	query = `SELECT * FROM urls WHERE user_id = $1`
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	rows, err := u.DB.QueryContext(ctx, query, args...)
+
+	if err != nil {
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return nil, models.ErrRecordNotFound
+		default:
+			return nil, err
+		}
+	}
+	defer rows.Close()
+
+	urls := make([]*models.Url, 0)
+	for rows.Next() {
+		var url models.Url
+		err := rows.Scan(
+			&url.ShortUrl,
+			&url.TargetUrl,
+			&url.Visits,
+			&url.UserId,
+			&url.CreatedAt,
+			&url.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		urls = append(urls, &url)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return urls, nil
 }
 
 func (u UrlModel) GetTargetUrl(urlKey string, userId int64, getInfo bool) (*models.Url, error) {

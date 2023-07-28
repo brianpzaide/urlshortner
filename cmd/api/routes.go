@@ -26,6 +26,7 @@ func (app *application) routes() http.Handler {
 
 		r1.Route("/user/urls", func(r2 chi.Router) {
 			r2.Use(app.authenticate)
+			r2.Get("/", app.listUrls)
 			r2.Post("/", app.createUrl)
 			r2.Get("/{url_key}", app.getUrlInfo)
 			r2.Delete("/{url_key}", app.deleteUrl)

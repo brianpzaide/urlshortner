@@ -28,6 +28,16 @@ func (app *application) redirectToTargetUrl(w http.ResponseWriter, r *http.Reque
 	http.Redirect(w, r, urlInfo.TargetUrl, http.StatusSeeOther)
 }
 
+func (app *application) listUrls(w http.ResponseWriter, r *http.Request) {
+	user := app.contextGetUser(r)
+	urls, err := app.models.Urls.ListUrls(user.ID)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+	app.writeJSON(w, http.StatusCreated, envelope{"urls": urls}, nil)
+}
+
 func (app *application) createUrl(w http.ResponseWriter, r *http.Request) {
 	user := app.contextGetUser(r)
 

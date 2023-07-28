@@ -79,6 +79,7 @@ type UserModelInterface interface {
 }
 type URLModelInterface interface {
 	Insert(*Url) error
+	ListUrls(int64) ([]*Url, error)
 	GetTargetUrl(string, int64, bool) (*Url, error)
 	DeleteUrl(string, int64) error
 }

@@ -8,5 +8,5 @@ RUN make build
 FROM golang:1.19-alpine AS deploy
 RUN apk --no-cache add ca-certificates
 COPY --from=builder /urlshortner/urlshortner ./
-COPY start.sh ./
+COPY scripts/start.sh ./
 CMD ["./start.sh"]
