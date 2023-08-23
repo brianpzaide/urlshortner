@@ -22,5 +22,5 @@ creating the tables
 ```
 migrate -path=./migrations -database=$DSN up
 ```
-## TODO
+### TODO
 - [ ] Add tests
