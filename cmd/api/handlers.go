@@ -2,8 +2,8 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
+	"strings"
 	"time"
 	"urlshortner/models"
 
@@ -35,7 +35,7 @@ func (app *application) listUrls(w http.ResponseWriter, r *http.Request) {
 		app.serverErrorResponse(w, r, err)
 		return
 	}
-	app.writeJSON(w, http.StatusCreated, envelope{"urls": urls}, nil)
+	app.writeJSON(w, http.StatusOK, envelope{"urls": urls}, nil)
 }
 
 func (app *application) createUrl(w http.ResponseWriter, r *http.Request) {
@@ -47,6 +47,10 @@ func (app *application) createUrl(w http.ResponseWriter, r *http.Request) {
 	err := app.readJSON(w, r, &input)
 	if err != nil {
 		app.badRequestResponse(w, r, err)
+		return
+	}
+	if strings.TrimSpace(input.TargetUrl) == "" {
+		app.badRequestResponse(w, r, errors.New("empty target_url"))
 		return
 	}
 	urlInfo := models.Url{
@@ -75,10 +79,11 @@ func (app *application) getUrlInfo(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	app.writeJSON(w, http.StatusCreated, envelope{"urlInfo": urlInfo}, nil)
+	app.writeJSON(w, http.StatusOK, envelope{"urlInfo": urlInfo}, nil)
 }
 
 func (app *application) deleteUrl(w http.ResponseWriter, r *http.Request) {
+
 	user := app.contextGetUser(r)
 
 	urlKey := chi.URLParam(r, "url_key")
@@ -106,6 +111,10 @@ func (app *application) registerUser(w http.ResponseWriter, r *http.Request) {
 	err := app.readJSON(w, r, &input)
 	if err != nil {
 		app.badRequestResponse(w, r, err)
+		return
+	}
+	if strings.TrimSpace(input.Email) == "" || strings.TrimSpace(input.Password) == "" {
+		app.badRequestResponse(w, r, errors.New("empty email or password"))
 		return
 	}
 	user := &models.User{
@@ -162,12 +171,10 @@ func (app *application) loginUser(w http.ResponseWriter, r *http.Request) {
 		app.invalidCredentialsResponse(w, r)
 		return
 	}
-	fmt.Println("no errors till login handler 178")
 	token, err := app.models.Tokens.New(user.ID, ttl, models.ScopeAuthentication)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 	}
-	fmt.Println("no errors till login handler 184")
 	err = app.writeJSON(w, http.StatusCreated, envelope{"authentication_token": token}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)

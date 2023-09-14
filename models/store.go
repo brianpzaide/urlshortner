@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/base32"
 	"errors"
-	"fmt"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -115,14 +114,11 @@ func GenerateToken(userId int64, ttl time.Duration, scope string) (*Token, error
 		Expiry: time.Now().Add(ttl),
 		Scope:  scope,
 	}
-	fmt.Println("no errors till store 117")
 	randomBytes := make([]byte, 16)
-	fmt.Println("no errors till store 119")
 	_, err := rand.Read(randomBytes)
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println("no errors till store 123")
 	token.Plaintext = base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(randomBytes)
 	hash := sha256.Sum256([]byte(token.Plaintext))
 	token.Hash = hash[:]

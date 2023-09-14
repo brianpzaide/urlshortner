@@ -15,7 +15,7 @@ data:
         url_key character(7) PRIMARY KEY,
         target_url VARCHAR(255) NOT NULL,
         visits bigint default 0,
-        user_id bigint NOT NULL,
+        user_id bigint NOT NULL ON DELETE CASCADE,
         created_at timestamp without time zone DEFAULT NOW(),
         updated_at timestamp without time zone DEFAULT NOW(),
         CONSTRAINT fk_user
@@ -25,7 +25,7 @@ data:
 
     CREATE TABLE IF NOT EXISTS tokens (
         token_hash bytea NOT NULL,
-        user_id bigint NOT NULL,
+        user_id bigint NOT NULL ON DELETE CASCADE,
         expiry timestamp without time zone DEFAULT NOW(),
         scope text NOT NULL,
         CONSTRAINT fk_user_token

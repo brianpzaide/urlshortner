@@ -1,83 +1,63 @@
 package mock
 
 import (
-	"sync"
 	"urlshortner/models"
 )
 
 const URL_KEY_LENGTH = 7
 
-var rwmutex sync.RWMutex
-
-type UrlModel struct {
-	DB map[string]*models.Url
-}
+type UrlModel struct{}
 
 func (u UrlModel) Insert(url *models.Url) error {
-	/*urlKey := models.GenURLKey(URL_KEY_LENGTH)
-	rwmutex.RLock()
-	for _, ok := u.DB[urlKey]; ok; {
-		urlKey = models.GenURLKey(7)
-	}
-	rwmutex.RUnlock()
 
-	rwmutex.Lock()
-	defer rwmutex.Unlock()
-	u.DB[urlKey] = &models.Url{
-		TargetUrl: targetUrl,
-		ShortUrl:  urlKey,
-		UserId:    userId,
-		CreatedAt: time.Now(),
-		Visits:    0,
-	}*/
+	urlKey := models.GenURLKey(URL_KEY_LENGTH)
+	_, ok := DB.Urls[urlKey]
+	for ok {
+		urlKey = models.GenURLKey(7)
+		_, ok = DB.Urls[urlKey]
+	}
+	DB.Urls[urlKey] = url
 	return nil
 }
 
 func (u UrlModel) ListUrls(userId int64) ([]*models.Url, error) {
-	/*urlKey := models.GenURLKey(URL_KEY_LENGTH)
-	rwmutex.RLock()
-	for _, ok := u.DB[urlKey]; ok; {
-		urlKey = models.GenURLKey(7)
-	}
-	rwmutex.RUnlock()
+	urlsList := make([]*models.Url, 0)
 
-	rwmutex.Lock()
-	defer rwmutex.Unlock()
-	u.DB[urlKey] = &models.Url{
-		TargetUrl: targetUrl,
-		ShortUrl:  urlKey,
-		UserId:    userId,
-		CreatedAt: time.Now(),
-		Visits:    0,
-	}*/
-	return nil, nil
+	for _, url := range DB.Urls {
+		if url.UserId == userId {
+			temp := url
+			urlsList = append(urlsList, temp)
+		}
+	}
+	return urlsList, nil
 }
 
 func (u UrlModel) GetTargetUrl(urlKey string, userId int64, getInfo bool) (*models.Url, error) {
-	rwmutex.RLock()
-	url, ok := u.DB[urlKey]
-	rwmutex.RUnlock()
+	url, ok := DB.Urls[urlKey]
 	if !ok {
 		return nil, models.ErrRecordNotFound
 	}
 	if !getInfo {
-		go u.updateVisitsForUrl("<url_key>")
+		url.Visits = url.Visits + 1
+		return url, nil
+	} else if userId == url.UserId {
+		return url, nil
+	} else {
+		return nil, models.ErrRecordNotFound
 	}
 
-	return url, nil
-}
-
-func (u UrlModel) updateVisitsForUrl(urlKey string) {
-	rwmutex.Lock()
-	defer rwmutex.Unlock()
-	if url, ok := u.DB[urlKey]; ok {
-		url.Visits += 1
-	}
 }
 
 func (u UrlModel) DeleteUrl(urlKey string, userId int64) error {
-	rwmutex.Lock()
-	defer rwmutex.Unlock()
-	delete(u.DB, urlKey)
+
+	url, ok := DB.Urls[urlKey]
+	if !ok {
+		return models.ErrRecordNotFound
+	}
+	if url.UserId != userId {
+		return models.ErrRecordNotFound
+	}
+
+	delete(DB.Urls, urlKey)
 	return nil
 }

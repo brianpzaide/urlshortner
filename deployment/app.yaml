@@ -15,7 +15,7 @@ spec:
       containers:
         - name: urlshortner
           image: brianpzaide/urlshortner:latest
-          imagePullPolicy: "IfNotPresent"
+          imagePullPolicy: "Always"
           ports:
             - containerPort: 4000
           env:

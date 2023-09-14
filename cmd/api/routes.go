@@ -17,7 +17,6 @@ func (app *application) routes() http.Handler {
 	router.NotFound(app.notFoundResponse)
 	router.MethodNotAllowed(app.methodNotAllowedResponse)
 
-	//TODO implement register and login handler
 	router.Post("/register", app.registerUser)
 	router.Post("/login", app.loginUser)
 
