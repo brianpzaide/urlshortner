@@ -1,6 +1,6 @@
 BINARY_NAME=urlshortner
 DSN="host=localhost port=5432 user=postgres password=mysecretpassword dbname=urlshortner sslmode=disable timezone=UTC connect_timeout=5"
-# URLSHORTNER_DB_DSN='postgres://postgres:mysecretpassword@localhost/urlshortner?sslmode=disable'
+DB_URL='postgres://postgres:mysecretpassword@localhost/urlshortner?sslmode=disable'
 ## build: Build binary
 build:
 	@echo "Building..."
@@ -31,6 +31,10 @@ stop:
 
 ## restart: stops and starts the application
 restart: stop start
+
+
+migrateup:
+	migrate -path ./migrations -database $(DB_URL) up
 
 ## test: runs all tests
 test:
