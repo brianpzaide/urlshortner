@@ -29,3 +29,12 @@ cd deployment
 
 kubectl apply -f .
 ```
+## Api endpoints
+* GET /v1/{url_key} - redirects to the actual website
+* POST /register
+* POST /login
+protected endpoints
+* GET /v1/user/urls/{url_key} - get statics of the url
+* DELETE /v1/user/urls/{url_key} - delete a created url 
+* GET /v1/user/urls/ - list the urls created.
+* POST /v1/user/urls/ - create new short urls.
