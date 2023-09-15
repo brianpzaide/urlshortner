@@ -33,6 +33,7 @@ kubectl apply -f .
 * GET /v1/{url_key} - redirects to the actual website
 * POST /register
 * POST /login
+
 protected endpoints
 * GET /v1/user/urls/{url_key} - get statics of the url
 * DELETE /v1/user/urls/{url_key} - delete a created url 
