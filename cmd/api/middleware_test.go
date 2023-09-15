@@ -10,29 +10,49 @@ import (
 	"urlshortner/models/mock"
 )
 
-func Test_authenticate(t *testing.T) {
-
+func setup(t *testing.T) (*application, *mock.MockDB) {
+	testApp := &application{}
 	// setting up mock database
-	mock.DB = mock.MockDB{
+	testdb := &mock.MockDB{
 		Users:       make(map[int64]*models.User),
-		EmailLookup: map[string]int64{},
+		EmailLookup: make(map[string]int64),
 		Urls:        make(map[string]*models.Url),
 		Tokens:      make(map[string]*models.Token),
 	}
-	mock.Count = 0
+
+	testApp.models = models.Models{
+		Users:  mock.NewUserModel(testdb),
+		Urls:   mock.NewUrlModel(testdb),
+		Tokens: mock.NewTokenModel(testdb),
+	}
+	return testApp, testdb
+}
+
+func Test_authenticate(t *testing.T) {
+
+	testApp, testdb := setup(t)
 
 	testUser := models.User{
 		Email: "abc@example.com",
 	}
 	testUser.Password.Set("123456")
-	err := app.models.Users.Insert(&testUser)
+	err := testApp.models.Users.Insert(&testUser)
 	if err != nil {
 		t.Fatal("error inserting new user", err)
 	}
 
-	tokenValid, err := app.models.Tokens.New(testUser.ID, ttl, models.ScopeAuthentication)
+	tempUsr, ok := testdb.Users[int64(0)]
+	if !ok || tempUsr.Email != testUser.Email {
+		t.Fatal("error inserting user into mock database")
+	}
+
+	tokenValid, err := testApp.models.Tokens.New(testUser.ID, ttl, models.ScopeAuthentication)
 	if err != nil {
 		t.Fatal("error generating token", err)
+	}
+	tempToken, ok := testdb.Tokens[tokenValid.Plaintext]
+	if !ok || tempToken.Plaintext != tokenValid.Plaintext {
+		t.Fatal("error inserting token into mock database")
 	}
 
 	tokenExpired, err := models.GenerateToken(testUser.ID, 0*time.Hour, models.ScopeAuthentication)
@@ -40,7 +60,7 @@ func Test_authenticate(t *testing.T) {
 		t.Fatal("error generating token", err)
 	}
 	tokenExpired.Expiry = time.Now().Add(time.Duration(-1) * time.Hour)
-	err = app.models.Tokens.Insert(tokenExpired)
+	err = testApp.models.Tokens.Insert(tokenExpired)
 	if err != nil {
 		t.Fatal("error inserting token", err)
 	}
@@ -65,7 +85,7 @@ func Test_authenticate(t *testing.T) {
 		}
 		rr := httptest.NewRecorder()
 
-		handlerToTest := app.authenticate(nextHandler)
+		handlerToTest := authenticate(testApp)(nextHandler)
 		handlerToTest.ServeHTTP(rr, req)
 
 		if e.expectAuthorized && rr.Code == http.StatusUnauthorized {
@@ -75,5 +95,6 @@ func Test_authenticate(t *testing.T) {
 		if !e.expectAuthorized && rr.Code != http.StatusUnauthorized {
 			t.Errorf("%s: did not get code 401, and should have", e.name)
 		}
+
 	}
 }

@@ -12,39 +12,41 @@ type MockDB struct {
 	Tokens      map[string]*models.Token
 }
 
-var (
-	Count int64
-	DB    MockDB
-)
+type UserModel struct {
+	db    *MockDB
+	count int
+}
 
-type UserModel struct{}
+func NewUserModel(db *MockDB) *UserModel {
+	return &UserModel{db: db, count: 0}
+}
 
 // used for registering new users
-func (usr UserModel) Insert(user *models.User) error {
+func (usr *UserModel) Insert(user *models.User) error {
 
-	if _, ok := DB.EmailLookup[user.Email]; ok {
+	if _, ok := usr.db.EmailLookup[user.Email]; ok {
 		return models.ErrDuplicateEmail
 	}
-	DB.Users[int64(Count)] = user
-	DB.Users[int64(Count)].ID = int64(Count)
-	DB.EmailLookup[user.Email] = int64(Count)
-	Count = Count + 1
+	usr.db.Users[int64(usr.count)] = user
+	usr.db.Users[int64(usr.count)].ID = int64(usr.count)
+	usr.db.EmailLookup[user.Email] = int64(usr.count)
+	usr.count = usr.count + 1
 
 	return nil
 }
 
 // used for users login
-func (usr UserModel) GetByEmail(email string) (*models.User, error) {
+func (usr *UserModel) GetByEmail(email string) (*models.User, error) {
 
-	userId, ok := DB.EmailLookup[email]
+	userId, ok := usr.db.EmailLookup[email]
 	if !ok {
 		return nil, models.ErrRecordNotFound
 	}
-	return DB.Users[userId], nil
+	return usr.db.Users[userId], nil
 }
 
-func (u UserModel) GetForToken(tokenScope, tokenPlaintext string) (*models.User, error) {
-	token, ok := DB.Tokens[tokenPlaintext]
+func (usr *UserModel) GetForToken(tokenScope, tokenPlaintext string) (*models.User, error) {
+	token, ok := usr.db.Tokens[tokenPlaintext]
 	if !ok {
 		return nil, models.ErrRecordNotFound
 	}
@@ -52,5 +54,5 @@ func (u UserModel) GetForToken(tokenScope, tokenPlaintext string) (*models.User,
 	if time.Now().After(token.Expiry) {
 		return nil, models.ErrRecordNotFound
 	}
-	return DB.Users[token.UserId], nil
+	return usr.db.Users[token.UserId], nil
 }

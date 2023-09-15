@@ -5,9 +5,15 @@ import (
 	"urlshortner/models"
 )
 
-type TokenModel struct{}
+type TokenModel struct {
+	db *MockDB
+}
 
-func (t TokenModel) New(userID int64, ttl time.Duration, scope string) (*models.Token, error) {
+func NewTokenModel(db *MockDB) *TokenModel {
+	return &TokenModel{db: db}
+}
+
+func (t *TokenModel) New(userID int64, ttl time.Duration, scope string) (*models.Token, error) {
 	token, err := models.GenerateToken(userID, ttl, scope)
 	if err != nil {
 		return nil, err
@@ -16,20 +22,20 @@ func (t TokenModel) New(userID int64, ttl time.Duration, scope string) (*models.
 	return token, err
 }
 
-func (t TokenModel) Insert(token *models.Token) error {
-	DB.Tokens[token.Plaintext] = token
+func (t *TokenModel) Insert(token *models.Token) error {
+	t.db.Tokens[token.Plaintext] = token
 	return nil
 }
 
-func (t TokenModel) DeleteAllForUser(scope string, userId int64) error {
+func (t *TokenModel) DeleteAllForUser(scope string, userId int64) error {
 	toBeDeleted := make([]string, 0)
-	for key, value := range DB.Tokens {
+	for key, value := range t.db.Tokens {
 		if value.UserId == userId && value.Scope == scope {
 			toBeDeleted = append(toBeDeleted, key)
 		}
 	}
 	for _, key := range toBeDeleted {
-		delete(DB.Tokens, key)
+		delete(t.db.Tokens, key)
 	}
 	return nil
 }

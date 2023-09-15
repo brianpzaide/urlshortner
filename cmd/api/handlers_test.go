@@ -3,26 +3,19 @@ package main
 import (
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"urlshortner/models"
-	"urlshortner/models/mock"
 
 	"github.com/go-chi/chi/v5"
 )
 
 func Test_registerUser(t *testing.T) {
 
-	// setting up mock database
-	mock.DB = mock.MockDB{
-		Users:       make(map[int64]*models.User),
-		EmailLookup: map[string]int64{},
-		Urls:        make(map[string]*models.Url),
-		Tokens:      make(map[string]*models.Token),
-	}
-	mock.Count = 0
+	testApp, testdb := setup(t)
 
 	var theTests = []struct {
 		name               string
@@ -41,7 +34,7 @@ func Test_registerUser(t *testing.T) {
 		reader = strings.NewReader(e.requestBody)
 		req, _ := http.NewRequest("POST", "/register", reader)
 		rr := httptest.NewRecorder()
-		handler := http.HandlerFunc(app.registerUser)
+		handler := http.HandlerFunc(registerUser(testApp))
 
 		handler.ServeHTTP(rr, req)
 
@@ -49,8 +42,16 @@ func Test_registerUser(t *testing.T) {
 			t.Errorf("%s: returned wrong status code; expected %d but got %d", e.name, e.expectedStatusCode, rr.Code)
 		}
 		if e.expectedStatusCode == http.StatusCreated {
-			if tempId := mock.DB.EmailLookup["abc.example.com"]; tempId != 0 {
-				t.Errorf("user not inserted into database")
+			tempId, ok := testdb.EmailLookup["abc@example.com"]
+			if !ok {
+				t.Errorf("user not inserted into mock database")
+			} else {
+				tempUser, ok := testdb.Users[tempId]
+				if !ok {
+					t.Errorf("user not inserted into mock database")
+				} else {
+					log.Println(tempUser.Email, tempUser.ID, "got created")
+				}
 			}
 		}
 	}
@@ -58,22 +59,19 @@ func Test_registerUser(t *testing.T) {
 
 func Test_loginUser(t *testing.T) {
 
-	// setting up mock database
-	mock.DB = mock.MockDB{
-		Users:       make(map[int64]*models.User),
-		EmailLookup: map[string]int64{},
-		Urls:        make(map[string]*models.Url),
-		Tokens:      make(map[string]*models.Token),
-	}
-	mock.Count = 0
+	testApp, testdb := setup(t)
 
 	testUser := models.User{
 		Email: "abc@example.com",
 	}
 	testUser.Password.Set("123456")
-	err := app.models.Users.Insert(&testUser)
+	err := testApp.models.Users.Insert(&testUser)
 	if err != nil {
 		t.Fatal("error inserting new user", err)
+	}
+	tempUsr, ok := testdb.Users[int64(0)]
+	if !ok || tempUsr.Email != testUser.Email {
+		t.Fatal("error inserting user into mock database")
 	}
 
 	var theTests = []struct {
@@ -94,7 +92,7 @@ func Test_loginUser(t *testing.T) {
 		reader = strings.NewReader(e.requestBody)
 		req := httptest.NewRequest("POST", "/login", reader)
 		rr := httptest.NewRecorder()
-		handler := http.HandlerFunc(app.loginUser)
+		handler := http.HandlerFunc(loginUser(testApp))
 
 		handler.ServeHTTP(rr, req)
 
@@ -105,36 +103,36 @@ func Test_loginUser(t *testing.T) {
 }
 
 func Test_redirectToTargetUrl(t *testing.T) {
-	// setting up mock database
-	mock.DB = mock.MockDB{
-		Users:       make(map[int64]*models.User),
-		EmailLookup: map[string]int64{},
-		Urls:        make(map[string]*models.Url),
-		Tokens:      make(map[string]*models.Token),
-	}
-	mock.Count = 0
+	testApp, testdb := setup(t)
 	testUser := models.User{
 		Email: "abc@example.com",
 	}
 	testUser.Password.Set("123456")
-	err := app.models.Users.Insert(&testUser)
+	err := testApp.models.Users.Insert(&testUser)
 	if err != nil {
 		t.Fatal("error inserting new user", err)
+	}
+	tempUsr, ok := testdb.Users[int64(0)]
+	if !ok || tempUsr.Email != testUser.Email {
+		t.Fatal("error inserting user into mock database")
 	}
 
 	urlInfo := models.Url{
 		TargetUrl: "https://stackoverflow.com/",
 		UserId:    int64(0),
 	}
-	app.models.Urls.Insert(&urlInfo)
+	err = testApp.models.Urls.Insert(&urlInfo)
+	if err != nil {
+		t.Fatal("error inserting user into mock database")
+	}
 
 	urlkeys := make([]string, 0)
-	for url_key := range mock.DB.Urls {
+	for url_key := range testdb.Urls {
 		urlkeys = append(urlkeys, url_key)
 	}
 
 	router := chi.NewRouter()
-	router.Get("/v1/{url_key}", app.redirectToTargetUrl)
+	router.Get("/v1/{url_key}", redirectToTargetUrl(testApp))
 
 	var theTests = []struct {
 		name               string
@@ -164,10 +162,12 @@ func Test_redirectToTargetUrl(t *testing.T) {
 				if loc.String() != e.expectedURL {
 					t.Errorf("redirected to %s instead of %s", loc.String(), e.expectedURL)
 				}
-			}
-			if url, ok := mock.DB.Urls[e.url]; ok {
-				if url.Visits == 0 {
-					t.Errorf("number of visits must increase by 1")
+				tempUrl, err := testApp.models.Urls.GetTargetUrl(urlkeys[0], int64(0), true)
+				if err != nil {
+					t.Error(err)
+				}
+				if tempUrl == nil || tempUrl.Visits == 0 {
+					t.Errorf("case: %s tempUrl is nil (or) number of visits must increase by 1", e.url)
 				}
 			}
 
@@ -176,52 +176,61 @@ func Test_redirectToTargetUrl(t *testing.T) {
 }
 
 func Test_apiHandlers(t *testing.T) {
-	// setting up mock database
-	mock.DB = mock.MockDB{
-		Users:       make(map[int64]*models.User),
-		EmailLookup: map[string]int64{},
-		Urls:        make(map[string]*models.Url),
-		Tokens:      make(map[string]*models.Token),
-	}
-	mock.Count = 0
+	testApp, testdb := setup(t)
 	userTokens := make([]string, 0)
 	testUser1 := models.User{
 		Email: "abc@example.com",
 	}
 	testUser1.Password.Set("123456")
-	err := app.models.Users.Insert(&testUser1)
+	err := testApp.models.Users.Insert(&testUser1)
 	if err != nil {
 		t.Fatal("error inserting new user", err)
 	}
-	token, err := app.models.Tokens.New(0, ttl, models.ScopeAuthentication)
+	tempUsr, ok := testdb.Users[int64(0)]
+	if !ok || tempUsr.Email != testUser1.Email {
+		t.Fatal("error inserting user into mock database")
+	}
+	token1, err := testApp.models.Tokens.New(tempUsr.ID, ttl, models.ScopeAuthentication)
 	if err != nil {
 		t.Fatal("error logging the user", err)
 	}
-	userTokens = append(userTokens, token.Plaintext)
+	tempToken1, ok := testdb.Tokens[token1.Plaintext]
+	if !ok || tempToken1.Plaintext != token1.Plaintext {
+		t.Fatal("error token not inserted into mock database for testUser1")
+	}
+	userTokens = append(userTokens, token1.Plaintext)
 
 	urlInfo := models.Url{
 		TargetUrl: "https://stackoverflow.com/",
-		UserId:    int64(0),
+		UserId:    tempUsr.ID,
 	}
-	app.models.Urls.Insert(&urlInfo)
+	testApp.models.Urls.Insert(&urlInfo)
 
 	testUser2 := models.User{
 		Email: "123@example.com",
 	}
 	testUser2.Password.Set("secret")
-	err = app.models.Users.Insert(&testUser2)
+	err = testApp.models.Users.Insert(&testUser2)
 	if err != nil {
 		t.Fatal("error inserting new user", err)
 	}
-	token, err = app.models.Tokens.New(1, ttl, models.ScopeAuthentication)
+	tempUsr2, ok := testdb.Users[int64(1)]
+	if !ok || tempUsr2.Email != testUser2.Email {
+		t.Fatal("error inserting user into mock database")
+	}
+	token2, err := testApp.models.Tokens.New(tempUsr2.ID, ttl, models.ScopeAuthentication)
 	if err != nil {
 		t.Fatal("error logging the user", err)
 	}
-	userTokens = append(userTokens, token.Plaintext)
+	tempToken2, ok := testdb.Tokens[token2.Plaintext]
+	if !ok || tempToken2.Plaintext != token2.Plaintext || tempToken2.UserId != token2.UserId {
+		t.Fatal("error token not inserted into mock database for testUser2")
+	}
+	userTokens = append(userTokens, token2.Plaintext)
 
 	urlkeys := make([]string, 0)
-	for url_key := range mock.DB.Urls {
-		urlkeys = append(urlkeys, url_key)
+	for url := range testdb.Urls {
+		urlkeys = append(urlkeys, url)
 	}
 
 	var tests = []struct {
@@ -230,33 +239,30 @@ func Test_apiHandlers(t *testing.T) {
 		method         string
 		json           string
 		paramID        string
-		handler        http.HandlerFunc
 		expectedStatus int
 	}{
-		{"listurls", userTokens[0], "GET", "", "", app.listUrls, http.StatusOK},
-		{"listurlsNotAuthenticated", "", "GET", "", "", app.listUrls, http.StatusUnauthorized},
-		{"getUrlNotAuthenticated", "", "GET", "", urlkeys[0], app.getUrlInfo, http.StatusUnauthorized},
-		{"getUrl", userTokens[0], "GET", "", urlkeys[0], app.getUrlInfo, http.StatusOK},
-		{"getUrlNotYetCreatedByUser", userTokens[0], "GET", "", "fish", app.getUrlInfo, http.StatusNotFound},
-		{"getUrlCreatedByOtherUser", userTokens[1], "GET", "", urlkeys[0], app.getUrlInfo, http.StatusNotFound},
-		{"deleteUrlNotAuthenticated", "", "DELETE", "", urlkeys[0], app.deleteUrl, http.StatusUnauthorized},
-		{"deleteUrl", userTokens[0], "DELETE", "", urlkeys[0], app.deleteUrl, http.StatusOK},
-		{"deleteUrlNotCreatedByUser", userTokens[1], "DELETE", "", urlkeys[0], app.deleteUrl, http.StatusNotFound},
-		{"createUrlNotAuthenticated", "", "POST", `{"target_url": "https://stackoverflow.com"}`, "", app.createUrl, http.StatusUnauthorized},
-		{"createUrl", userTokens[0], "POST", `{"target_url": "https://stackoverflow.com"}`, "", app.createUrl, http.StatusCreated},
-		{"createUrlBadJSON", userTokens[0], "POST", `{}`, "", app.createUrl, http.StatusBadRequest},
-		{"createUrlNotJSON", userTokens[0], "POST", `not json`, "", app.createUrl, http.StatusBadRequest},
+		{"listurls", userTokens[0], "GET", "", "", http.StatusOK},
+		{"listurlsNotAuthenticated", "", "GET", "", "", http.StatusUnauthorized},
+		{"getUrlNotAuthenticated", "", "GET", "", urlkeys[0], http.StatusUnauthorized},
+		{"getUrl", userTokens[0], "GET", "", urlkeys[0], http.StatusOK},
+		{"getUrlNotYetCreatedByUser", userTokens[0], "GET", "", "fish", http.StatusNotFound},
+		{"getUrlCreatedByOtherUser", userTokens[1], "GET", "", urlkeys[0], http.StatusNotFound},
+		{"deleteUrlNotAuthenticated", "", "DELETE", "", urlkeys[0], http.StatusUnauthorized},
+		{"deleteUrl", userTokens[0], "DELETE", "", urlkeys[0], http.StatusOK},
+		{"deleteUrlNotCreatedByUser", userTokens[1], "DELETE", "", urlkeys[0], http.StatusNotFound},
+		{"createUrlNotAuthenticated", "", "POST", `{"target_url": "https://stackoverflow.com"}`, "", http.StatusUnauthorized},
+		{"createUrl", userTokens[0], "POST", `{"target_url": "https://stackoverflow.com"}`, "", http.StatusCreated},
+		{"createUrlBadJSON", userTokens[0], "POST", `{}`, "", http.StatusBadRequest},
+		{"createUrlNotJSON", userTokens[0], "POST", `not json`, "", http.StatusBadRequest},
 	}
 
 	router := chi.NewRouter()
-	router.Route("/v1/", func(r1 chi.Router) {
-		r1.Route("/user/urls", func(r2 chi.Router) {
-			r2.Use(app.authenticate)
-			r2.Get("/", app.listUrls)
-			r2.Post("/", app.createUrl)
-			r2.Get("/{url_key}", app.getUrlInfo)
-			r2.Delete("/{url_key}", app.deleteUrl)
-		})
+	router.Route("/v1/user/urls", func(r1 chi.Router) {
+		r1.Use(authenticate(testApp))
+		r1.Get("/{url_key}", getUrlInfo(testApp))
+		r1.Delete("/{url_key}", deleteUrl(testApp))
+		r1.Get("/", listUrls(testApp))
+		r1.Post("/", createUrl(testApp))
 	})
 
 	for _, e := range tests {
@@ -267,6 +273,7 @@ func Test_apiHandlers(t *testing.T) {
 		if e.paramID != "" {
 			reqUrl = fmt.Sprintf("/v1/user/urls/%s", e.paramID)
 		}
+		log.Printf("testname: %s url: %s", e.name, reqUrl)
 
 		if e.json == "" {
 			req = httptest.NewRequest(e.method, reqUrl, nil)

@@ -1,29 +1,36 @@
 package mock
 
 import (
+	"log"
 	"urlshortner/models"
 )
 
 const URL_KEY_LENGTH = 7
 
-type UrlModel struct{}
+type UrlModel struct {
+	db *MockDB
+}
 
-func (u UrlModel) Insert(url *models.Url) error {
+func NewUrlModel(db *MockDB) *UrlModel {
+	return &UrlModel{db: db}
+}
+
+func (u *UrlModel) Insert(url *models.Url) error {
 
 	urlKey := models.GenURLKey(URL_KEY_LENGTH)
-	_, ok := DB.Urls[urlKey]
+	_, ok := u.db.Urls[urlKey]
 	for ok {
 		urlKey = models.GenURLKey(7)
-		_, ok = DB.Urls[urlKey]
+		_, ok = u.db.Urls[urlKey]
 	}
-	DB.Urls[urlKey] = url
+	u.db.Urls[urlKey] = url
 	return nil
 }
 
-func (u UrlModel) ListUrls(userId int64) ([]*models.Url, error) {
+func (u *UrlModel) ListUrls(userId int64) ([]*models.Url, error) {
 	urlsList := make([]*models.Url, 0)
 
-	for _, url := range DB.Urls {
+	for _, url := range u.db.Urls {
 		if url.UserId == userId {
 			temp := url
 			urlsList = append(urlsList, temp)
@@ -32,8 +39,8 @@ func (u UrlModel) ListUrls(userId int64) ([]*models.Url, error) {
 	return urlsList, nil
 }
 
-func (u UrlModel) GetTargetUrl(urlKey string, userId int64, getInfo bool) (*models.Url, error) {
-	url, ok := DB.Urls[urlKey]
+func (u *UrlModel) GetTargetUrl(urlKey string, userId int64, getInfo bool) (*models.Url, error) {
+	url, ok := u.db.Urls[urlKey]
 	if !ok {
 		return nil, models.ErrRecordNotFound
 	}
@@ -48,9 +55,9 @@ func (u UrlModel) GetTargetUrl(urlKey string, userId int64, getInfo bool) (*mode
 
 }
 
-func (u UrlModel) DeleteUrl(urlKey string, userId int64) error {
-
-	url, ok := DB.Urls[urlKey]
+func (u *UrlModel) DeleteUrl(urlKey string, userId int64) error {
+	log.Printf("DeleteUrl userid: %d, urlKey: %s", userId, urlKey)
+	url, ok := u.db.Urls[urlKey]
 	if !ok {
 		return models.ErrRecordNotFound
 	}
@@ -58,6 +65,6 @@ func (u UrlModel) DeleteUrl(urlKey string, userId int64) error {
 		return models.ErrRecordNotFound
 	}
 
-	delete(DB.Urls, urlKey)
+	delete(u.db.Urls, urlKey)
 	return nil
 }

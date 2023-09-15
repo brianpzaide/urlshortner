@@ -14,11 +14,13 @@ type tempRoute struct {
 }
 
 func Test_app_routes(t *testing.T) {
+	testApp := application{}
 
 	var registered = []struct {
 		route  string
 		method string
 	}{
+		{"/healtz", "GET"},
 		{"/register", "POST"},
 		{"/login", "POST"},
 		{"/v1/{url_key}", "GET"},
@@ -28,7 +30,7 @@ func Test_app_routes(t *testing.T) {
 		{"/v1/user/urls/{url_key}", "DELETE"},
 	}
 
-	chiRoutes := app.routes().(chi.Routes)
+	chiRoutes := routes(&testApp).(chi.Routes)
 	for _, route := range registered {
 		// check to see if the route exists
 		if !routeExists(route.route, route.method, chiRoutes) {
