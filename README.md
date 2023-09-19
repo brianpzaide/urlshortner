@@ -4,7 +4,7 @@ This is a simple url shortner REST api, built with Golang. It is backed by postg
 
 ### Docker
 ```bash
-docker-compose up
+docker-compose up -d
 ```
 Run migrations
 
