@@ -35,7 +35,7 @@ kubectl apply -f .
 * POST ```/login```
 
 protected endpoints
-* GET ```/v1/user/urls/{url_key}``` - get statics of the url
+* GET ```/v1/user/urls/{url_key}``` - get stats for the url
 * DELETE ```/v1/user/urls/{url_key}``` - delete a created url 
 * GET ```/v1/user/urls/``` - list the urls created.
 * POST ```/v1/user/urls/``` - create new short urls.
